@@ -205,6 +205,16 @@ int kvz_config_destroy(kvz_config *cfg)
     FREE_POINTER(cfg->slice_addresses_in_ts);
     FREE_POINTER(cfg->optional_key);
     FREE_POINTER(cfg->fastrd_learning_outdir_fn);
+    if (cfg->ime_algorithm == KVZ_IME_LOG) {
+      write_statistics_file(cfg->inter_stat_list, cfg->stat_out_file);
+      free_statistics_list(cfg->inter_stat_list);
+    }
+    if (cfg->pitch_file) fclose(cfg->pitch_file);
+    if (cfg->roll_file) fclose(cfg->roll_file);
+    if (cfg->throttle_file) fclose(cfg->throttle_file);
+    if (cfg->yaw_file) fclose(cfg->yaw_file);
+    if (cfg->stat_out_file) fclose(cfg->stat_out_file);
+    if (cfg->uis_dir_file) fclose(cfg->uis_dir_file);
   }
   free(cfg);
 
@@ -451,7 +461,7 @@ static int parse_slice_specification(const char* const arg, int32_t * const nsli
 
 int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 {
-  static const char * const me_names[]          = { "hexbs", "tz", "full", "full8", "full16", "full32", "full64", "dia", NULL };
+  static const char * const me_names[]          = { "hexbs", "tz", "full", "full8", "full16", "full32", "full64", "dia", "uis", "log", NULL};
   static const char * const source_scan_type_names[] = { "progressive", "tff", "bff", NULL };
 
   static const char * const overscan_names[]    = { "undef", "show", "crop", NULL };
@@ -842,6 +852,27 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     int8_t ime_algorithm = 0;
     if (!parse_enum(value, me_names, &ime_algorithm)) return 0;
     cfg->ime_algorithm = ime_algorithm;
+    if (cfg->ime_algorithm == KVZ_IME_LOG) {
+      cfg->inter_stat_list = create_head();
+    }
+  }
+  else if OPT("pitch") {
+    cfg->pitch_file = fopen(value, "r");
+  }
+  else if OPT("roll") {
+    cfg->roll_file = fopen(value, "r");
+  }
+  else if OPT("throttle") {
+    cfg->throttle_file = fopen(value, "r");
+  }
+  else if OPT("yaw") {
+    cfg->yaw_file = fopen(value, "r");
+  }
+  else if OPT("uis-dir") {
+    cfg->uis_dir_file = fopen(value, "r");
+  }
+  else if OPT("stat-out") {
+    cfg->stat_out_file = fopen(value, "w");
   }
   else if OPT("subme")
     cfg->fme_level = atoi(value);

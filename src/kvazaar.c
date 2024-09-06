@@ -271,6 +271,27 @@ static int kvazaar_encode(kvz_encoder *enc,
   );
   if (frame) {
     assert(state->frame->num == enc->frames_started);
+    if (state->encoder_control->cfg.uis_dir_file) {
+      state->frame->uis_dir = fgetc(state->encoder_control->cfg.uis_dir_file);
+      if (state->frame->uis_dir == EOF) {
+        state->frame->uis_dir = '0';
+      }
+    }
+    if (state->encoder_control->cfg.ime_algorithm == KVZ_IME_LOG) {
+      if (!fscanf(state->encoder_control->cfg.pitch_file, "%lf", &state->frame->pitch)) {
+        state->frame->pitch = 0.0;
+      }
+      if (!fscanf(state->encoder_control->cfg.roll_file, "%lf", &state->frame->roll)) {
+        state->frame->roll = 0.0;
+      }
+      if (!fscanf(state->encoder_control->cfg.throttle_file, "%lf", &state->frame->throttle)) {
+        state->frame->throttle = 0.0;
+      }
+      if (!fscanf(state->encoder_control->cfg.yaw_file, "%lf", &state->frame->yaw)) {
+        state->frame->yaw = 0.0;
+      }
+      state->frame->inter_stat_list = state->encoder_control->cfg.inter_stat_list;
+    }
     // Start encoding.
     kvz_encode_one_frame(state, frame);
     enc->frames_started += 1;

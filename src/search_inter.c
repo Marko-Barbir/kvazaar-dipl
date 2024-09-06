@@ -886,6 +886,461 @@ static void diamond_search(inter_search_info_t *info,
   // and we're done
 }
 
+/**
+* \brief Do motion search using the User Input Search algorithm.
+*
+* \param info      search info
+* \param extra_mv  extra motion vector to check
+* \param steps     how many steps are done at maximum before exiting
+*
+* Motion vector is searched by searching iteratively with a diamond-shaped
+* pattern, but with having user input in mind. We take care of not checking
+* the direction we came from, but further checking for avoiding visits to
+* already visited points is not done.
+*
+* If a non 0,0 predicted motion vector predictor is given as extra_mv,
+* the 0,0 vector is also tried. This is hoped to help in the case where
+* the predicted motion vector is way off. In the future even more additional
+* points like 0,0 might be used, such as vectors from top or left.
+**/
+static void user_input_search(inter_search_info_t* info,
+  vector2d_t extra_mv,
+  uint32_t steps,
+  double* best_cost,
+  double* best_bits,
+  vector2d_t* best_mv)
+{
+  int direction = info->state->frame->uis_dir - '0';
+  float probabilities_matrix[3][3] = { 0.0f };
+  float prob_t = 0.5f;
+  float block_x = (float)info->origin.x;
+  float block_y = (float)info->origin.y;
+  float range_factor_x = 1.0f;
+  float range_factor_y = 1.0f;
+  float sr = 2.0f;
+
+  //if (block_x == 0 && info->state->frame->num == 2)
+      //fprintf(stderr, "Coords: (%f, %f): \n", block_x, block_y);
+
+  int frame_height = info->pic->height;
+  int frame_width = info->pic->width;
+
+
+  if (direction < 0 || direction > 7) {
+    direction = 0;
+  }
+
+  enum diapos {
+    UIS_CENTER = 0,
+    UIS_UP = 1,
+    UIS_DOWN = 2,
+    UIS_RIGHT = 3,
+    UIS_LEFT = 4
+  };
+
+  // a grid shape with the center included
+  // 5 1 6
+  // 4 0 3
+  // 7 2 8
+  static const vector2d_t diamond[9] = {
+  {0, 0}, {0, -1}, {0, 1}, {1, 0},
+  {-1, 0}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}
+  };
+  // current motion vector
+  vector2d_t mv = { best_mv->x >> 2, best_mv->y >> 2 };
+
+  // current best index
+  enum diapos best_index = UIS_CENTER;
+
+  // initial search of center location
+  if (check_mv_cost(info, mv.x, mv.y, best_cost, best_bits, best_mv)) {
+    best_index = 0;
+  }
+
+
+  // if no input was received, do a normal diamond seach (search the rest of the 4 diamond points as well)
+  if (direction == 0) {
+    for (int i = 1; i < 5; ++i) {
+      if (check_mv_cost(info, mv.x + diamond[i].x, mv.y + diamond[i].y, best_cost, best_bits, best_mv)) {
+        best_index = i;
+      }
+    }
+  }
+
+  // if the input was an up-down or left-right movement (roll or throttle), search for a specific direction only
+  else if (direction > 0 && direction < 5) {
+    if (check_mv_cost(info, mv.x + diamond[direction].x, mv.y + diamond[direction].y, best_cost, best_bits, best_mv)) {
+      best_index = direction;
+    }
+  }
+
+  // yaw left
+  else if (direction == 5) {
+    // up
+    probabilities_matrix[0][1] = max((block_x + block_y) / (frame_height + frame_width), (frame_width - block_x + frame_height - block_y) / (frame_width + frame_height));
+    if (probabilities_matrix[0][1] < 0.7)
+      probabilities_matrix[0][1] = 0;
+    // down
+    probabilities_matrix[2][1] = max((abs(block_x - frame_width) + block_y) / (frame_height + frame_width), (abs(block_y - frame_height) + block_x) / (frame_width + frame_height));
+    if (probabilities_matrix[2][1] < 0.7)
+      probabilities_matrix[2][1] = 0;
+    /*
+    // left upper
+    probabilities_matrix[0][0] = max(block_x / frame_width, 1 - block_x / frame_width);
+    if ((block_x > 0.5 * frame_width && block_y < 0.33 * frame_height) || (block_x < 0.5 * frame_width && block_y > 0.66 * frame_height))
+        probabilities_matrix[0][0] = 0;
+    // left bottom
+    probabilities_matrix[2][0] = max(block_x / frame_width, 1 - block_x / frame_width);
+    if ((block_x < 0.5 * frame_width && block_y < 0.33 * frame_height) || (block_x > 0.5 * frame_width && block_y > 0.66 * frame_height))
+        probabilities_matrix[0][0] = 0;
+    */
+
+    for (int i = 1; i < 5; ++i) {
+      if (check_mv_cost(info, mv.x + diamond[i].x, mv.y + diamond[i].y, best_cost, best_bits, best_mv)) {
+        best_index = i;
+      }
+    }
+  }
+
+  // yaw right
+  else if (direction == 6) {
+
+    // up
+    probabilities_matrix[0][1] = max((abs(block_x - frame_width) + block_y) / (frame_height + frame_width), (abs(block_y - frame_height) + block_x) / (frame_width + frame_height));
+    if (probabilities_matrix[0][1] < 0.7)
+      probabilities_matrix[0][1] = 0;
+    // down
+    probabilities_matrix[2][1] = max((block_x + block_y) / (frame_height + frame_width), (frame_width - block_x + frame_height - block_y) / (frame_width + frame_height));
+    if (probabilities_matrix[2][1] < 0.7)
+      probabilities_matrix[2][1] = 0;
+    /*
+    // right upper
+    probabilities_matrix[0][2] = max(block_x / frame_width, 1 - block_x / frame_width);
+    if ((block_x < 0.5 * frame_width && block_y < 0.33 * frame_height) || (block_x > 0.5 * frame_width && block_y > 0.66 * frame_height))
+        probabilities_matrix[0][2] = 0;
+
+    // right bottom
+    probabilities_matrix[2][2] = max(block_x / frame_width, 1 - block_x / frame_width);
+    if ((block_x > 0.5 * frame_width && block_y < 0.33 * frame_height) || (block_x < 0.5 * frame_width && block_y > 0.66 * frame_height))
+        probabilities_matrix[2][2] = 0;
+    */
+
+    for (int i = 1; i < 5; ++i) {
+      if (check_mv_cost(info, mv.x + diamond[i].x, mv.y + diamond[i].y, best_cost, best_bits, best_mv)) {
+        best_index = i;
+      }
+    }
+  }
+
+  // if the input was a pitch movement, search by the custom me model
+  else {
+    // up
+    probabilities_matrix[0][1] = block_y / frame_height;
+    // left
+    probabilities_matrix[1][0] = block_x / frame_width;
+    // right
+    probabilities_matrix[1][2] = 1 - probabilities_matrix[1][0];
+    // down
+    probabilities_matrix[2][1] = 1 - probabilities_matrix[0][1];
+
+    /*
+    // center
+    //probabilities_matrix[1][1] = 1 - sqrt((block_x - frame_width / 2) * (block_x - frame_width / 2) + ((block_y - frame_height / 2) * (block_y - frame_height / 2))) / (sqrt(frame_width / 2 * frame_width / 2 + frame_height / 2 * frame_height / 2));
+    // left upper
+    probabilities_matrix[0][0] = (block_x + block_y) / (frame_width + frame_height);
+    // left bottom
+    probabilities_matrix[2][0] = (abs(block_y - frame_height) + block_x) / (frame_height + frame_width);
+    // right upper
+    probabilities_matrix[0][2] = (abs(block_x - frame_width) + block_y) / (frame_width + frame_height);
+    // right bottom
+    probabilities_matrix[2][2] = 1 - probabilities_matrix[0][0];
+    */
+
+    if (probabilities_matrix[0][1] > prob_t) {
+      if (check_mv_cost(info, mv.x, mv.y + diamond[1].y * sr * probabilities_matrix[0][1], best_cost, best_bits, best_mv)) {
+        best_index = 1;
+        range_factor_x = 1.0f;
+        range_factor_y = sr * probabilities_matrix[0][1];
+      }
+    }
+    if (probabilities_matrix[1][0] > prob_t) {
+      if (check_mv_cost(info, mv.x + diamond[4].x * sr * probabilities_matrix[1][0], mv.y, best_cost, best_bits, best_mv)) {
+        best_index = 4;
+        range_factor_x = sr * probabilities_matrix[1][0];
+        range_factor_y = 1.0f;
+      }
+    }
+    if (probabilities_matrix[1][2] > prob_t) {
+      if (check_mv_cost(info, mv.x + diamond[3].x * sr * probabilities_matrix[1][2], mv.y, best_cost, best_bits, best_mv)) {
+        best_index = 3;
+        range_factor_x = sr * probabilities_matrix[1][2];
+        range_factor_y = 1.0f;
+      }
+    }
+    if (probabilities_matrix[2][1] > prob_t) {
+      if (check_mv_cost(info, mv.x, mv.y + diamond[2].y * sr * probabilities_matrix[2][1], best_cost, best_bits, best_mv)) {
+        best_index = 2;
+        range_factor_x = 1.0f;
+        range_factor_y = sr * probabilities_matrix[2][1];
+      }
+    }
+
+    // corners (diagonal searches)
+    /*
+    if (probabilities_matrix[0][0] > prob_t) {
+        if (check_mv_cost(info, mv.x + diamond[5].x * sr * probabilities_matrix[1][0], mv.y + diamond[5].y * sr * probabilities_matrix[0][1], best_cost, best_bits, best_mv)) {
+            best_index = 5;
+            range_factor_x = sr * probabilities_matrix[1][0];
+            range_factor_y = sr * probabilities_matrix[0][1];
+        }
+    }
+    if (probabilities_matrix[2][0] > prob_t) {
+        if (check_mv_cost(info, mv.x + diamond[7].x * sr * probabilities_matrix[1][0], mv.y + diamond[7].y * sr * probabilities_matrix[2][1], best_cost, best_bits, best_mv)){
+            best_index = 7;
+            range_factor_x = sr * probabilities_matrix[1][0];
+            range_factor_y = sr * probabilities_matrix[2][1];
+        }
+    }
+    if (probabilities_matrix[0][2] > prob_t) {
+        if (check_mv_cost(info, mv.x + diamond[6].x * sr * probabilities_matrix[1][2], mv.y + diamond[6].y * sr * probabilities_matrix[0][1], best_cost, best_bits, best_mv)) {
+            best_index = 6;
+            range_factor_x = sr * probabilities_matrix[1][2];
+            range_factor_y = sr * probabilities_matrix[0][1];
+        }
+    }
+    if (probabilities_matrix[2][2] > prob_t) {
+        if (check_mv_cost(info, mv.x + diamond[8].x * sr * probabilities_matrix[1][2], mv.y + diamond[8].y * sr * probabilities_matrix[2][1], best_cost, best_bits, best_mv)) {
+            best_index = 8;
+            range_factor_x = sr * probabilities_matrix[1][2];
+            range_factor_y = sr * probabilities_matrix[2][1];
+        }
+    }
+    */
+
+  }
+
+  if (best_index == UIS_CENTER) {
+    // the center point was the best in initial check
+    return;
+  }
+
+  // Move the center to the best match.
+  mv.x += diamond[best_index].x * range_factor_x;
+  mv.y += diamond[best_index].y * range_factor_y;
+
+  // the arrival direction, the index of the diamond member that will be excluded
+  enum diapos from_dir = UIS_CENTER;
+
+  // whether we found a better candidate this iteration
+  uint8_t better_found;
+
+  do {
+    range_factor_x = 1.0f;
+    range_factor_y = 1.0f;
+    better_found = 0;
+    // decrement count if enabled
+    if (steps > 0) steps -= 1;
+
+    // if no input was received, do a normal diamond seach
+    if (direction == 0) {
+      // search the points of the diamond
+      for (int i = 1; i < 5; ++i) {
+        // this is where we came from so it's checked already
+        if (i == from_dir) continue;
+
+        if (check_mv_cost(info, mv.x + diamond[i].x, mv.y + diamond[i].y, best_cost, best_bits, best_mv)) {
+          best_index = i;
+          better_found = 1;
+        }
+      }
+    }
+
+    // if the input was an up-down or left-right movement (roll or throttle), search for a specific direction only
+    else if (direction > 0 && direction < 5) {
+      if (check_mv_cost(info, mv.x + diamond[direction].x, mv.y + diamond[direction].y, best_cost, best_bits, best_mv)) {
+        best_index = direction;
+        better_found = 1;
+      }
+    }
+
+    // yaw left
+    else if (direction == 5) {
+
+      if (from_dir != 4) {
+        if (check_mv_cost(info, mv.x + diamond[4].x, mv.y, best_cost, best_bits, best_mv)) {
+          best_index = 4;
+          better_found = 1;
+        }
+      }
+      if (probabilities_matrix[0][1] > prob_t && from_dir != 1) {
+        if (check_mv_cost(info, mv.x, mv.y + diamond[1].y, best_cost, best_bits, best_mv)) {
+          best_index = 1;
+          better_found = 1;
+        }
+      }
+      if (probabilities_matrix[2][1] > prob_t && from_dir != 2) {
+        if (check_mv_cost(info, mv.x, mv.y + diamond[2].y, best_cost, best_bits, best_mv)) {
+          best_index = 2;
+          better_found = 1;
+        }
+      }
+      /*
+      if (probabilities_matrix[0][0] > prob_t) {
+          if (check_mv_cost(info, mv.x + diamond[5].x * sr * probabilities_matrix[0][0], mv.y + diamond[5].y, best_cost, best_bits, best_mv)) {
+              best_index = 5;
+              range_factor_x = sr * probabilities_matrix[0][0];
+              range_factor_y = 1.0f;
+          }
+      }
+      if (probabilities_matrix[2][0] > prob_t) {
+          if (check_mv_cost(info, mv.x + diamond[7].x * sr * probabilities_matrix[2][0], mv.y + diamond[7].y, best_cost, best_bits, best_mv)) {
+              best_index = 7;
+              range_factor_x = sr * probabilities_matrix[2][0];
+              range_factor_y = 1.0f;
+          }
+      }
+      */
+    }
+
+    // yaw right
+    else if (direction == 6) {
+
+      if (from_dir != 3) {
+        if (check_mv_cost(info, mv.x + diamond[3].x, mv.y, best_cost, best_bits, best_mv)) {
+          best_index = 3;
+          better_found = 1;
+        }
+      }
+      if (probabilities_matrix[0][1] > prob_t && from_dir != 1) {
+        if (check_mv_cost(info, mv.x, mv.y + diamond[1].y, best_cost, best_bits, best_mv)) {
+          best_index = 1;
+          better_found = 1;
+        }
+      }
+      if (probabilities_matrix[2][1] > prob_t && from_dir != 2) {
+        if (check_mv_cost(info, mv.x, mv.y + diamond[2].y, best_cost, best_bits, best_mv)) {
+          best_index = 2;
+          better_found = 1;
+        }
+      }
+      /*
+      if (probabilities_matrix[0][2] > prob_t) {
+          if (check_mv_cost(info, mv.x + diamond[6].x * sr * probabilities_matrix[0][2], mv.y + diamond[6].y, best_cost, best_bits, best_mv)) {
+              best_index = 6;
+              range_factor_x = sr * probabilities_matrix[0][2];
+              range_factor_y = 1.0f;
+              better_found = 1;
+          }
+      }
+      if (probabilities_matrix[2][2] > prob_t) {
+          if (check_mv_cost(info, mv.x + diamond[8].x * sr * probabilities_matrix[2][2], mv.y + diamond[8].y, best_cost, best_bits, best_mv)) {
+              best_index = 8;
+              range_factor_x = sr * probabilities_matrix[2][2];
+              range_factor_y = 1.0f;
+              better_found = 1;
+          }
+      }
+      */
+    }
+
+    // if the input was a pitch movement, search by the custom me model
+    // OVDJE TRAZENJE CENTRA NEMA SMISLA; NOVI CENTAR JE LOKACIJA KOJU SMO PRETRAZILI U KORAKU PRIJE
+    else {
+      /*
+      // corners (diagonal searches)
+      if (probabilities_matrix[0][0] > prob_t && from_dir != 5) {
+          if (check_mv_cost(info, mv.x + diamond[5].x * sr * probabilities_matrix[1][0], mv.y + diamond[5].y * sr * probabilities_matrix[0][1], best_cost, best_bits, best_mv)) {
+              best_index = 5;
+              better_found = 1;
+              range_factor_x = sr * probabilities_matrix[1][0];
+              range_factor_y = sr * probabilities_matrix[0][1];
+          }
+      }
+      if (probabilities_matrix[2][0] > prob_t && from_dir != 7) {
+          if (check_mv_cost(info, mv.x + diamond[7].x * sr * probabilities_matrix[1][0], mv.y + diamond[7].y * sr * probabilities_matrix[2][1], best_cost, best_bits, best_mv)) {
+              best_index = 7;
+              better_found = 1;
+              range_factor_x = sr * probabilities_matrix[1][0];
+              range_factor_y = sr * probabilities_matrix[2][1];
+          }
+      }
+      if (probabilities_matrix[0][2] > prob_t && from_dir != 6) {
+          if (check_mv_cost(info, mv.x + diamond[6].x * sr * probabilities_matrix[1][2], mv.y + diamond[6].y * sr * probabilities_matrix[0][1], best_cost, best_bits, best_mv)) {
+              best_index = 6;
+              better_found = 1;
+              range_factor_x = sr * probabilities_matrix[1][2];
+              range_factor_y = sr * probabilities_matrix[0][1];
+          }
+      }
+      if (probabilities_matrix[2][2] > prob_t && from_dir != 8) {
+          if (check_mv_cost(info, mv.x + diamond[8].x * sr * probabilities_matrix[1][2], mv.y + diamond[8].y * sr * probabilities_matrix[2][1], best_cost, best_bits, best_mv)) {
+              best_index = 8;
+              better_found = 1;
+              range_factor_x = sr * probabilities_matrix[1][2];
+              range_factor_y = sr * probabilities_matrix[2][1];
+          }
+      }
+      */
+      if (probabilities_matrix[0][1] > prob_t && from_dir != 1) {
+        if (check_mv_cost(info, mv.x, mv.y + diamond[1].y * sr * probabilities_matrix[0][1], best_cost, best_bits, best_mv)) {
+          best_index = 1;
+          better_found = 1;
+          range_factor_x = 1.0f;
+          range_factor_y = sr * probabilities_matrix[0][1];
+        }
+      }
+      if (probabilities_matrix[1][0] > prob_t && from_dir != 4) {
+        if (check_mv_cost(info, mv.x + diamond[4].x * sr * probabilities_matrix[1][0], mv.y, best_cost, best_bits, best_mv)) {
+          best_index = 4;
+          better_found = 1;
+          range_factor_x = sr * probabilities_matrix[1][0];
+          range_factor_y = 1.0f;
+        }
+      }
+      if (probabilities_matrix[1][2] > prob_t && from_dir != 3) {
+        if (check_mv_cost(info, mv.x + diamond[3].x * sr * probabilities_matrix[1][2], mv.y, best_cost, best_bits, best_mv)) {
+          best_index = 3;
+          better_found = 1;
+          range_factor_x = sr * probabilities_matrix[1][2];
+          range_factor_y = 1.0f;
+        }
+      }
+      if (probabilities_matrix[2][1] > prob_t && from_dir != 2) {
+        if (check_mv_cost(info, mv.x, mv.y + diamond[2].y * sr * probabilities_matrix[2][1], best_cost, best_bits, best_mv)) {
+          best_index = 2;
+          better_found = 1;
+          range_factor_x = 1.0f;
+          range_factor_y = sr * probabilities_matrix[2][1];
+        }
+      }
+    }
+
+    if (better_found) {
+      // Move the center to the best match.
+      mv.x += diamond[best_index].x * range_factor_x;
+      mv.y += diamond[best_index].y * range_factor_y;
+
+      // record where we came from to the next iteration
+      if (best_index == 1)
+        from_dir = 2;
+      if (best_index == 2)
+        from_dir = 1;
+      if (best_index == 3)
+        from_dir = 4;
+      if (best_index == 4)
+        from_dir = 3;
+      if (best_index == 5)
+        from_dir = 8;
+      if (best_index == 6)
+        from_dir = 7;
+      if (best_index == 7)
+        from_dir = 6;
+      if (best_index == 8)
+        from_dir = 5;
+    }
+  } while (better_found && steps != 0);
+  // and we're done
+}
 
 static void search_mv_full(inter_search_info_t *info,
                            int32_t search_range,
@@ -962,6 +1417,45 @@ static void search_mv_full(inter_search_info_t *info,
   }
 }
 
+static void search_mv_full_with_logs(inter_search_info_t* info,
+  int32_t search_range,
+  vector2d_t extra_mv,
+  double* best_cost,
+  double* best_bits,
+  vector2d_t* best_mv)
+{
+  search_inter_statistic_t* cur_stat = append_next(info->state->frame->inter_stat_list);
+
+  cur_stat->cur_idx = info->state->frame->num;
+  cur_stat->ref_idx = info->ref_idx;
+  cur_stat->width = info->width;
+  cur_stat->height = info->height;
+
+  cur_stat->origin.x = info->origin.x;
+  cur_stat->origin.y = info->origin.y;
+  cur_stat->offset.x = info->state->tile->offset_x;
+  cur_stat->offset.y = info->state->tile->offset_y;
+
+  cur_stat->pitch = info->state->frame->pitch;
+  cur_stat->roll = info->state->frame->roll;
+  cur_stat->throttle = info->state->frame->throttle;
+  cur_stat->yaw = info->state->frame->yaw;
+  int direction = info->state->frame->uis_dir - '0';
+  cur_stat->direction = direction;
+
+  cur_stat->start_mv.x = extra_mv.x;
+  cur_stat->start_mv.y = extra_mv.y;
+
+  tz_search(info, extra_mv, best_cost, best_bits, best_mv);
+
+  cur_stat->best_mv.x = best_mv->x;
+  cur_stat->best_mv.y = best_mv->y;
+  cur_stat->best_cost = *best_cost;
+  cur_stat->best_bits = *best_bits;
+
+  statistics_list_exit_critical_section();
+}
+
 
 /**
  * \brief Do fractional motion estimation
@@ -1002,7 +1496,7 @@ static void search_frac(inter_search_info_t *info,
   ALIGNED(64) int16_t intermediate[5][KVZ_IPOL_MAX_IM_SIZE_LUMA_SIMD];
   int16_t hor_first_cols[5][KVZ_EXT_BLOCK_W_LUMA + 1];
 
-  const kvz_picture *ref = info->ref;
+   const kvz_picture *ref = info->ref;
   const kvz_picture *pic = info->pic;
   vector2d_t orig = info->origin;
   const int width = info->width;
@@ -1337,6 +1831,7 @@ static void search_pu_inter_ref(inter_search_info_t *info,
     case KVZ_IME_FULL32: search_range = 32; break;
     case KVZ_IME_FULL16: search_range = 16; break;
     case KVZ_IME_FULL8: search_range = 8; break;
+    case KVZ_IME_LOG: search_range = 64; break;
     default: break;
   }
 
@@ -1367,6 +1862,12 @@ static void search_pu_inter_ref(inter_search_info_t *info,
         diamond_search(info, best_mv, info->state->encoder_control->cfg.me_max_steps,
                        &best_cost, &best_bits, &best_mv);
         break;
+      case KVZ_IME_UIS:
+        user_input_search(info, best_mv, info->state->encoder_control->cfg.me_max_steps,
+          &best_cost, &best_bits, &best_mv);
+        break;
+      case KVZ_IME_LOG:
+        search_mv_full_with_logs(info, search_range, best_mv, &best_cost, &best_bits, &best_mv);
 
       default:
         hexagon_search(info, best_mv, info->state->encoder_control->cfg.me_max_steps,

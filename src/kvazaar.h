@@ -40,6 +40,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <build/kvazaar_lib/search_inter_statistics.h>
 
 
 #ifdef __cplusplus
@@ -116,6 +117,8 @@ enum kvz_ime_algorithm {
   KVZ_IME_FULL32 = 5, //! \since 3.6.0
   KVZ_IME_FULL64 = 6, //! \since 3.6.0
   KVZ_IME_DIA = 7, // Experimental. TODO: change into a proper doc comment
+  KVZ_IME_UIS = 8, // \JAKOV
+  KVZ_IME_LOG = 9, // \Marko
 };
 
 /**
@@ -494,6 +497,17 @@ typedef struct kvz_config
   uint8_t fast_bipred;
 
   uint8_t enable_logging_output; //!< \brief May be used to disable the logging output to stderr. Default: on.
+
+  search_inter_statistic_list_t* inter_stat_list;
+
+  FILE* pitch_file; // RSV
+  FILE* roll_file; // RSH
+  FILE* throttle_file; // LSV
+  FILE* yaw_file; // LSH
+
+  FILE* stat_out_file; //statistics output
+
+  FILE* uis_dir_file;
 } kvz_config;
 
 /**

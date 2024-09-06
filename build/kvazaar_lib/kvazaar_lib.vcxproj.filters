@@ -52,6 +52,9 @@
     <Filter Include="Constraint">
       <UniqueIdentifier>{895fc8cc-6f08-49a7-b377-b5c38a44d1b1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Dipl">
+      <UniqueIdentifier>{cca553b3-931b-4eea-a6e0-7db6971eb84a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\strategies\strategies-nal.c">
@@ -244,6 +247,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\ml_intra_cu_depth_pred.c">
       <Filter>Constraint</Filter>
+    </ClCompile>
+    <ClCompile Include="search_inter_statistics.c">
+      <Filter>Dipl</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -462,5 +468,11 @@
     <ClInclude Include="..\..\src\gop.h">
       <Filter>Control</Filter>
     </ClInclude>
+    <ClInclude Include="search_inter_statistics.h">
+      <Filter>Dipl</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>

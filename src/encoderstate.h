@@ -103,6 +103,14 @@ typedef struct encoder_state_config_frame_t {
    */
   double lambda;
 
+  double pitch; // RSV
+  double roll; // RSH
+  double throttle; // LSV
+  double yaw; // LSH
+  char uis_dir;
+
+  search_inter_statistic_list_t *inter_stat_list;
+
   int32_t num;       /*!< \brief Frame number */
   int32_t poc;       /*!< \brief Picture order count */
   int8_t gop_offset; /*!< \brief Offset in the gop structure */

@@ -178,6 +178,12 @@ static const struct option long_options[] = {
   { "no-fast-bipred",           no_argument, NULL, 0 },
   { "enable-logging",           no_argument, NULL, 0 },
   { "no-enable-logging",        no_argument, NULL, 0 },
+  { "uis-dir",            required_argument, NULL, 0 },
+  { "pitch",            required_argument, NULL, 0 },
+  { "roll",            required_argument, NULL, 0 },
+  { "throttle",            required_argument, NULL, 0 },
+  { "yaw",            required_argument, NULL, 0 },
+  { "stat-out",            required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
