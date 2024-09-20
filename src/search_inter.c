@@ -34,6 +34,7 @@
 
 #include <limits.h>
 #include <stdlib.h>
+#include <build/kvazaar_lib/motion_predicted_search.h>
 
 #include "cabac.h"
 #include "encoder.h"
@@ -48,6 +49,7 @@
 #include "strategies/strategies-picture.h"
 #include "transform.h"
 #include "videoframe.h"
+#include "Windows.h"
 
 typedef struct {
   encoder_state_t *state;
@@ -910,6 +912,14 @@ static void user_input_search(inter_search_info_t* info,
   double* best_bits,
   vector2d_t* best_mv)
 {
+  LARGE_INTEGER frequency;        // Stores the frequency of the performance counter
+  LARGE_INTEGER start_t, end_t;       // Variables to store the start and end times
+  double elapsedMicroseconds;     // Stores the elapsed time in microseconds
+
+  QueryPerformanceFrequency(&frequency);
+
+  QueryPerformanceCounter(&start_t);
+
   int direction = info->state->frame->uis_dir - '0';
   float probabilities_matrix[3][3] = { 0.0f };
   float prob_t = 0.5f;
@@ -1340,6 +1350,24 @@ static void user_input_search(inter_search_info_t* info,
     }
   } while (better_found && steps != 0);
   // and we're done
+
+  QueryPerformanceCounter(&end_t);
+
+  elapsedMicroseconds = (double)(end_t.QuadPart - start_t.QuadPart) * 1000000.0 / frequency.QuadPart;
+
+  printf("Elapsed time: %.3f microseconds\n", elapsedMicroseconds);
+}
+
+static void nn_predicted_search_mv(inter_search_info_t* info,
+  vector2d_t extra_mv,
+  double* best_cost,
+  double* best_bits,
+  vector2d_t* best_mv) {
+  vector2d_t mv_cand = { 0,0 };
+
+  fcnn_step(info->state->frame->y1, info->origin.x, info->origin.y, info->width, info->height, extra_mv.x, extra_mv.y, &mv_cand.x, &mv_cand.y);
+
+  check_mv_cost(info, mv_cand.x, mv_cand.y, best_cost, best_bits, best_mv);
 }
 
 static void search_mv_full(inter_search_info_t *info,
@@ -1424,7 +1452,7 @@ static void search_mv_full_with_logs(inter_search_info_t* info,
   double* best_bits,
   vector2d_t* best_mv)
 {
-  search_inter_statistic_t* cur_stat = append_next(info->state->frame->inter_stat_list);
+  search_inter_statistic_t* cur_stat = append_next(info->state->encoder_control->cfg.inter_stat_list);
 
   cur_stat->cur_idx = info->state->frame->num;
   cur_stat->ref_idx = info->ref_idx;
@@ -1868,7 +1896,10 @@ static void search_pu_inter_ref(inter_search_info_t *info,
         break;
       case KVZ_IME_LOG:
         search_mv_full_with_logs(info, search_range, best_mv, &best_cost, &best_bits, &best_mv);
-
+        break;
+      case KVZ_IME_PREDICT:
+        nn_predicted_search_mv(info, best_mv, &best_cost, &best_bits, &best_mv);
+        break;
       default:
         hexagon_search(info, best_mv, info->state->encoder_control->cfg.me_max_steps,
                        &best_cost, &best_bits, &best_mv);

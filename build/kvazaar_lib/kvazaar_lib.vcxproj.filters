@@ -251,6 +251,9 @@
     <ClCompile Include="search_inter_statistics.c">
       <Filter>Dipl</Filter>
     </ClCompile>
+    <ClCompile Include="motion_predicted_search.c">
+      <Filter>Dipl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h">
@@ -471,8 +474,13 @@
     <ClInclude Include="search_inter_statistics.h">
       <Filter>Dipl</Filter>
     </ClInclude>
+    <ClInclude Include="motion_predicted_search.h">
+      <Filter>Dipl</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-x64\native\onnxruntime.dll" />
+    <None Include="$(MSBuildThisFileDirectory)..\..\runtimes\win-x64\native\onnxruntime_providers_shared.dll" />
     <None Include="packages.config" />
   </ItemGroup>
 </Project>

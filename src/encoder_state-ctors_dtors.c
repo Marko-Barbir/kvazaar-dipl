@@ -96,6 +96,8 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
 
   state->frame->new_ratecontrol = kvz_get_rc_data(NULL);
 
+  state->frame->y1 = NULL;
+
   return 1;
 }
 
@@ -109,6 +111,8 @@ static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
   kvz_image_list_destroy(state->frame->ref);
   FREE_POINTER(state->frame->lcu_stats);
   FREE_POINTER(state->frame->aq_offsets);
+
+  FREE_POINTER(state->frame->y1);
 }
 
 static int encoder_state_config_tile_init(encoder_state_t * const state, 

@@ -35,6 +35,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <build/kvazaar_lib/motion_predicted_search.h>
 
 #include "bitstream.h"
 #include "cfg.h"
@@ -79,6 +80,9 @@ static void kvazaar_close(kvz_encoder *encoder)
     FREE_POINTER(encoder->states);
 
     kvz_free_rc_data();
+    if (encoder->control->cfg.ime_algorithm == KVZ_IME_PREDICT) {
+      free_models();
+    }
     // Discard const from the pointer.
     kvz_encoder_control_free((void*) encoder->control);
     encoder->control = NULL;
@@ -89,6 +93,10 @@ static void kvazaar_close(kvz_encoder *encoder)
 
 static kvz_encoder * kvazaar_open(const kvz_config *cfg)
 {
+  if (cfg->ime_algorithm == KVZ_IME_PREDICT) {
+    init_models();
+  }
+
   kvz_encoder *encoder = NULL;
 
   //Initialize strategies
@@ -278,19 +286,24 @@ static int kvazaar_encode(kvz_encoder *enc,
       }
     }
     if (state->encoder_control->cfg.ime_algorithm == KVZ_IME_LOG) {
-      if (!fscanf(state->encoder_control->cfg.pitch_file, "%lf", &state->frame->pitch)) {
+      state->frame->inter_stat_list = state->encoder_control->cfg.inter_stat_list;
+    }
+    if (state->encoder_control->cfg.ime_algorithm == KVZ_IME_LOG || state->encoder_control->cfg.ime_algorithm == KVZ_IME_PREDICT) {
+      if (!fscanf(state->encoder_control->cfg.pitch_file, "%f", &state->frame->pitch)) {
         state->frame->pitch = 0.0;
       }
-      if (!fscanf(state->encoder_control->cfg.roll_file, "%lf", &state->frame->roll)) {
+      if (!fscanf(state->encoder_control->cfg.roll_file, "%f", &state->frame->roll)) {
         state->frame->roll = 0.0;
       }
-      if (!fscanf(state->encoder_control->cfg.throttle_file, "%lf", &state->frame->throttle)) {
+      if (!fscanf(state->encoder_control->cfg.throttle_file, "%f", &state->frame->throttle)) {
         state->frame->throttle = 0.0;
       }
-      if (!fscanf(state->encoder_control->cfg.yaw_file, "%lf", &state->frame->yaw)) {
+      if (!fscanf(state->encoder_control->cfg.yaw_file, "%f", &state->frame->yaw)) {
         state->frame->yaw = 0.0;
       }
-      state->frame->inter_stat_list = state->encoder_control->cfg.inter_stat_list;
+    }
+    if (state->encoder_control->cfg.ime_algorithm == KVZ_IME_PREDICT) {
+      lstm_step(state->frame->pitch, state->frame->roll, state->frame->throttle, state->frame->yaw, &state->frame->y1);
     }
     // Start encoding.
     kvz_encode_one_frame(state, frame);

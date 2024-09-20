@@ -40,7 +40,7 @@ int statistics_list_exit_critical_section() {
 }
 
 static void writeHeader(FILE *out_file) {
-  fprintf(out_file, "cur_idx,ref_idx,origin_x,origin_y,width,height,pitch,roll,throttle,yaw,direction,start_mv_x,start_mv_y,best_mv_x,best_mv_y,best_cost,best_bits\n");
+  fprintf(out_file, "cur_idx,origin_x,origin_y,width,height,pitch,roll,throttle,yaw,direction,start_mv_x,start_mv_y,best_mv_x,best_mv_y,best_cost,best_bits\n");
 }
 
 static void writeLine(const search_inter_statistic_t *line, FILE *out_file) {

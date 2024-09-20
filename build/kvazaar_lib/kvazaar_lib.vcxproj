@@ -67,6 +67,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)$(Platform)-$(Configuration)-libs\</OutDir>
+    <CopyLocalDeploymentContent>false</CopyLocalDeploymentContent>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)$(Platform)-$(Configuration)-libs\</OutDir>
@@ -108,15 +109,16 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Lib>
-      <AdditionalLibraryDirectories>
-      </AdditionalLibraryDirectories>
-      <AdditionalDependencies>
-      </AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\mbarbir\source\repos\kvazaar-dipl\build\packages\Microsoft.ML.OnnxRuntime.1.19.2\runtimes\win-x64\native;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>onnxruntime.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
     <ClCompile>
       <UndefinePreprocessorDefinitions>
       </UndefinePreprocessorDefinitions>
     </ClCompile>
+    <ProjectReference>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\constraint.c" />
@@ -182,6 +184,7 @@
     <ClCompile Include="..\..\src\strategies\strategies-encode.c" />
     <ClCompile Include="..\..\src\strategies\strategies-intra.c" />
     <ClCompile Include="..\..\src\strategies\strategies-quant.c" />
+    <ClCompile Include="motion_predicted_search.c" />
     <ClCompile Include="search_inter_statistics.c" />
     <ClInclude Include="..\..\src\checkpoint.h" />
     <ClInclude Include="..\..\src\constraint.h" />
@@ -263,6 +266,7 @@
     <ClInclude Include="..\..\src\strategies\strategies-encode.h" />
     <ClInclude Include="..\..\src\strategies\strategies-intra.h" />
     <ClInclude Include="..\..\src\strategies\strategies-quant.h" />
+    <ClInclude Include="motion_predicted_search.h" />
     <ClInclude Include="search_inter_statistics.h" />
   </ItemGroup>
   <ItemGroup>
@@ -310,7 +314,20 @@
     <ClInclude Include="..\..\src\videoframe.h" />
   </ItemGroup>
   <ItemGroup>
+    <CopyFileToFolders Update="C:\Users\mbarbir\source\repos\kvazaar-dipl\build\packages\Microsoft.ML.OnnxRuntime.1.19.2\build\native\..\..\runtimes\win-x64\native\onnxruntime.dll">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="C:\Users\mbarbir\source\repos\kvazaar-dipl\build\packages\Microsoft.ML.OnnxRuntime.1.19.2\build\native\..\..\runtimes\win-x64\native\onnxruntime.dll">
+      <FileType>Document</FileType>
+    </None>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Update="C:\Users\mbarbir\source\repos\kvazaar-dipl\build\packages\Microsoft.ML.OnnxRuntime.1.19.2\build\native\..\..\runtimes\win-x64\native\onnxruntime.dll">
+      <FileType>Document</FileType>
+    </Resource>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

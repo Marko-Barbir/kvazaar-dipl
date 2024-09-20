@@ -103,11 +103,13 @@ typedef struct encoder_state_config_frame_t {
    */
   double lambda;
 
-  double pitch; // RSV
-  double roll; // RSH
-  double throttle; // LSV
-  double yaw; // LSH
+  float pitch; // RSV
+  float roll; // RSH
+  float throttle; // LSV
+  float yaw; // LSH
   char uis_dir;
+
+  float* y1;
 
   search_inter_statistic_list_t *inter_stat_list;
 

@@ -119,6 +119,7 @@ enum kvz_ime_algorithm {
   KVZ_IME_DIA = 7, // Experimental. TODO: change into a proper doc comment
   KVZ_IME_UIS = 8, // \JAKOV
   KVZ_IME_LOG = 9, // \Marko
+  KVZ_IME_PREDICT = 10, // \Marko
 };
 
 /**
